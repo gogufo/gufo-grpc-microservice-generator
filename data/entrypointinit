@@ -1,0 +1,16 @@
+package entrypoint
+
+import (
+	. "{{name}}/version"
+
+	"github.com/spf13/viper"
+)
+
+func Init() {
+	EntryPoint()
+	updateversion()
+}
+
+func updateversion() {
+	viper.Set("microservices.{{name}}.entrypointversion", VERSIONPLUGIN)
+}
