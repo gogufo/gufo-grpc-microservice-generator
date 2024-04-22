@@ -28,3 +28,12 @@ internal_host = ''
 #connectionssize = 100
 #poolsize = 100
 #sslmode = 'disable'
+
+
+[microservices]
+[microservices.{{name}}]
+type = 'server'
+host = '{{name}}'
+port = '5300'
+entrypointversion = '1.0.0'
+cron = 'false'

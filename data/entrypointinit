@@ -2,6 +2,7 @@ package entrypoint
 
 import (
 	. "{{name}}/version"
+	. "{{name}}/global"
 
 	"github.com/spf13/viper"
 )
@@ -12,5 +13,6 @@ func Init() {
 }
 
 func updateversion() {
-	viper.Set("microservices.{{name}}.entrypointversion", VERSIONPLUGIN)
+setingskey := fmt.Sprintf("%s.entrypointversion", MicroServiceName)
+viper.Set(setingskey, VERSIONPLUGIN)
 }

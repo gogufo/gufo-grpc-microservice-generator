@@ -5,6 +5,7 @@ import (
 	pb "github.com/gogufo/gufo-api-gateway/proto/go"
 
 	. "{{name}}/version"
+	ad "{{name}}/admin"
 )
 
 func Init(t *pb.Request) (response *pb.Response) {
@@ -12,6 +13,11 @@ func Init(t *pb.Request) (response *pb.Response) {
 if *t.UID == "" {
 	response = ErrorReturn(t, 401, "000011", "You are not authorised")
 	return response
+}
+
+switch *t.Param {
+case "admin":
+	return admincheck(t)
 }
 
 if *t.Method == "GET" {
@@ -44,4 +50,14 @@ func health(t *pb.Request) (response *pb.Response) {
 	ans["health"] = "OK"
 	response = Interfacetoresponse(t, ans)
 	return response
+}
+
+func admincheck(t *pb.Request) (response *pb.Response) {
+
+	if *t.IsAdmin != 1 {
+		response = ErrorReturn(t, 401, "000012", "You have no admin rights")
+	}
+
+	return ad.Init(t)
+
 }

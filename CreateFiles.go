@@ -9,8 +9,51 @@ import (
 
 func CreateFiles(name string, filepath string) {
 
-	endfiles := []string{"main.go", "config/config.toml", "entrypoint/entrypoint.go", "entrypoint/init.go", "version/version.go", "CHANGELOG.md", "Dockerfile", "init.go", "README.md", "admin/init.go", "go.mod", "go.sum", "docs/README.md"}
-	datafiles := []string{"main", "config", "entrypoint", "entrypointinit", "version", "changelog", "dockerfile", "init", "readme", "admininit", "mod", "sum", "docs"}
+	endfiles := []string{
+		"main.go",
+		"config/config.toml",
+		"entrypoint/entrypoint.go",
+		"entrypoint/init.go",
+		"version/version.go",
+		"CHANGELOG.md",
+		"Dockerfile",
+		"init.go",
+		"README.md",
+		"admin/init.go",
+		"go.mod",
+		"go.sum",
+		"docs/README.md", //
+		"cron/init.go",
+		"global/constants.go",
+		"global/variables.go",
+		"admin/get/init.go",
+		"admin/get/CheckCron.go",
+		"admin/post/init.go",
+		"admin/post/UpdateCron.go",
+	}
+
+	datafiles := []string{
+		"main",
+		"config",
+		"entrypoint",
+		"entrypointinit",
+		"version",
+		"changelog",
+		"dockerfile",
+		"init",
+		"readme",
+		"admininit",
+		"mod",
+		"sum",
+		"docs", //
+		"croninit",
+		"consts",
+		"vars",
+		"admingetinit",
+		"admingetcheck",
+		"adminpostinit",
+		"adminpostupdate",
+	}
 
 	for i := 0; i < len(endfiles); i++ {
 

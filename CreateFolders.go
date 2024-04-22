@@ -8,7 +8,7 @@ import (
 func CreateFolders(name string) string {
 	//1. Create folders
 	// Create folders in /src folder.
-	foldersarray := []string{"config", "entrypoint", "version", "admin", "docs"}
+	foldersarray := []string{"config", "entrypoint", "version", "admin", "docs", "global", "cron", "admin/post", "admin/get"}
 	initFilePath := "/src"
 	m9s := filepath.Join(initFilePath, name)
 

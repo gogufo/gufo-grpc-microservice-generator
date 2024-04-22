@@ -35,4 +35,6 @@ Before run microservice need to add in API Gateway config next lines
 type = 'server'
 host = '{{name}}'
 port = '5300'
+entrypointversion = 1.0.0
+cron = false
 ```

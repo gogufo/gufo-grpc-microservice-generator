@@ -3,6 +3,8 @@ package main
 import (
 	"{{name}}/entrypoint"
 	. "{{name}}/version"
+	"{{name}}/cron"
+	. "{{name}}/global"
 	"flag"
 	"fmt"
 	"net"
@@ -80,10 +82,18 @@ func main() {
 
 	s := &Server{}
 
-	lastentrypointversion := viper.GetString("microservices.journals.entrypointversion")
+	setingskey := fmt.Sprintf("%s.entrypointversion", MicroServiceName)
+	lastentrypointversion := viper.GetString(setingskey)
 
 	if lastentrypointversion != VERSIONPLUGIN {
 		go entrypoint.Init()
+	}
+
+	// Run Cron
+	setingskey = fmt.Sprintf("%s.cron", MicroServiceName)
+	isCron := viper.GetBool(setingskey)
+	if isCron {
+		go cron.Init()
 	}
 
 	pb.RegisterReverseServer(grpcServer, s)
