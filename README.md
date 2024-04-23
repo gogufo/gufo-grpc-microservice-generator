@@ -12,3 +12,9 @@ docker build --no-cache -t amyerp/gufo_grpc_microservice_generator:latest -f Doc
 ```
 docker run --rm -v $(pwd):/src amyerp/gufo_grpc_microservice_generator:latest /go/bin/grpccreator {microservice_name}
 ```
+
+2. Before build MicroServiceName
+
+```
+go mod tidy
+```
