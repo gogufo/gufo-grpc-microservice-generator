@@ -115,7 +115,7 @@ func (s *Server) Do(c context.Context, request *pb.Request) (response *pb.Respon
 
 	if viper.GetBool("server.checktoken") {
 		//Check Authorisation
-		if *request.UID == "" {
+		if request.UID == nil {
 			return ErrorReturn(request, 401, "00002", "You are not authorized"), nil
 		}
 
