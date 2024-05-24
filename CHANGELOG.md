@@ -1,6 +1,13 @@
 # Changelog
 
-## 1.2.0 (06/06/24)
+## 1.3.0 (15/05/24)
+- Bug fix with entrypoint version
+- Bug fix with cron status
+- Now it is possible to set microservice listen port
+- Update Dockerfile
+- Add version in generated files
+
+## 1.2.0 (06/05/24)
 - Bug fix with Authorisation check
 
 ## 1.1.0 (22/04/24)

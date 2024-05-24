@@ -75,6 +75,7 @@ func CreateFiles(name string, filepath string) {
 		}
 
 		updatedmaintxt := strings.Replace(string(maintxt), "{{name}}", name, -1)
+		updatedmaintxt = strings.Replace(string(updatedmaintxt), "{{version}}", VERSIONPLUGIN, -1)
 
 		err = ioutil.WriteFile(maingofilepath, []byte(updatedmaintxt), 0644)
 		if err != nil {

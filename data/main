@@ -1,3 +1,5 @@
+// Generated with GRPC Microservice Creator v{{version}}
+
 package main
 
 import (
@@ -5,7 +7,6 @@ import (
 	. "{{name}}/version"
 	"{{name}}/cron"
 	. "{{name}}/global"
-	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -24,9 +25,6 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
-var (
-	grpcServerEndpoint = flag.String("grpc-server-endpoint", "localhost:5300", "gRPC server endpoint")
-)
 
 func main() {
 	viper.SetConfigName("config") // name of config file (without extension)
@@ -71,7 +69,14 @@ func main() {
 
 	}
 
-	listener, err := net.Listen("tcp", ":5300")
+	portvar := fmt.Sprintf("microservices.%s.port", MicroServiceName)
+	getport := viper.GetString(portvar)
+	port := ":5300"
+	if getport != "" {
+		port = fmt.Sprintf(":%s", getport)
+	}
+
+	listener, err := net.Listen("tcp", port)
 
 	if err != nil {
 		grpclog.Fatalf("failed to listen: %v", err)
@@ -82,7 +87,7 @@ func main() {
 
 	s := &Server{}
 
-	setingskey := fmt.Sprintf("%s.entrypointversion", MicroServiceName)
+	setingskey := fmt.Sprintf("microservices.%s.entrypointversion", MicroServiceName)
 	lastentrypointversion := viper.GetString(setingskey)
 
 	if lastentrypointversion != VERSIONPLUGIN {
@@ -90,7 +95,7 @@ func main() {
 	}
 
 	// Run Cron
-	setingskey = fmt.Sprintf("%s.cron", MicroServiceName)
+	setingskey = fmt.Sprintf("microservices.%s.cron", MicroServiceName)
 	isCron := viper.GetBool(setingskey)
 	if isCron {
 		go cron.Init()
