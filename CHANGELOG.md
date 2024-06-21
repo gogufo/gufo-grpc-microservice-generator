@@ -1,6 +1,9 @@
 # Changelog
 
-## 1.3.0 (15/05/24)
+## 1.4.0 (21/06/24)
+- Fixed bug with GET requests
+
+## 1.3.0 (24/05/24)
 - Bug fix with entrypoint version
 - Bug fix with cron status
 - Now it is possible to set microservice listen port

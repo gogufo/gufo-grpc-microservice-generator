@@ -18,8 +18,6 @@ if t.UID == nil {
 switch *t.Param {
 case "admin":
 	return admincheck(t)
-default:
-return ErrorReturn(t, 406, "000012", "Wrong request")
 }
 
 if *t.Method == "GET" {
