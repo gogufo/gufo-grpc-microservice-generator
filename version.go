@@ -1,3 +1,3 @@
 package main
 
-const VERSIONPLUGIN = "1.4.0"
+const VERSIONPLUGIN = "1.5.0"

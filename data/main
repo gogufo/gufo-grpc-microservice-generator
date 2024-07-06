@@ -94,6 +94,8 @@ func main() {
 		go entrypoint.Init()
 	}
 
+	go entrypoint.EntryPoint()
+
 	// Run Cron
 	setingskey = fmt.Sprintf("microservices.%s.cron", MicroServiceName)
 	isCron := viper.GetBool(setingskey)
