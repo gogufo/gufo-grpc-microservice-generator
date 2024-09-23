@@ -10,10 +10,6 @@ import (
 
 func Init(t *pb.Request) (response *pb.Response) {
 
-if t.UID == nil {
-	response = ErrorReturn(t, 401, "000011", "You are not authorised")
-	return response
-}
 
 switch *t.Param {
 case "admin":

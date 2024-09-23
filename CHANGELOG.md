@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.0 (23/09/24)
+- remove second check of authorisation
+- update Gufo to v1.17.0
+
 ## 1.5.0 (21/06/24)
 - Add ssl certs in Dockerfile
 - Change Entrypoint logig. Now Entrypoint funxtion is running everytime when container starts. We add Update function. It is running one time if version of microservice is different
