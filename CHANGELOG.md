@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.0 (11/10/24)
+- Fixed bug with microservice name
+- Print out error if can not find config files
+- Print out informaton about port runing
+
 ## 1.6.0 (23/09/24)
 - remove second check of authorisation
 - update Gufo to v1.17.0

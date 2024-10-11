@@ -34,7 +34,8 @@ func main() {
 	//	portsrting := fmt.Sprintf(":%d", port)
 
 	if err := viper.ReadInConfig(); err != nil {
-		fmt.Printf("Error with Settings \n")
+	fmt.Printf("Error with Settings \n")
+	fmt.Printf(err.Error())
 		os.Exit(3)
 	}
 
@@ -70,7 +71,9 @@ func main() {
 	}
 
 	portvar := fmt.Sprintf("microservices.%s.port", MicroServiceName)
+	fmt.Printf(fmt.Sprintf("%s \n", portvar))
 	getport := viper.GetString(portvar)
+	fmt.Printf(fmt.Sprintf("Start %s:%s \n", MicroServiceName, getport))
 	port := ":5300"
 	if getport != "" {
 		port = fmt.Sprintf(":%s", getport)
