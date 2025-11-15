@@ -1,139 +1,445 @@
 // Generated with GRPC Microservice Creator v{{version}}
 
+
 package main
 
 import (
-	"{{name}}/entrypoint"
-	. "{{name}}/version"
-	"{{name}}/cron"
-	. "{{name}}/global"
 	"fmt"
+	"io"
 	"net"
 	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
 	"time"
 
-	pb "github.com/gogufo/gufo-api-gateway/proto/go"
+	"{{name}}/cron"
+	"{{name}}/entrypoint"
+	. "{{name}}/global"
+	"{{name}}/middleware"
+	. "{{name}}/version"
 
 	. "github.com/gogufo/gufo-api-gateway/gufodao"
+	pb "github.com/gogufo/gufo-api-gateway/proto/go"
 
 	"github.com/certifi/gocertifi"
 	"github.com/getsentry/sentry-go"
-
 	"github.com/spf13/viper"
+
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
+
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
+// fileState describes a file being received via streaming
+type fileState struct {
+	path    string
+	f       *os.File
+	written int64
+}
 
+// Server implements pb.ReverseServer
+type Server struct{}
+
+// ======================= MAIN =======================
 func main() {
-	viper.SetConfigName("config") // name of config file (without extension)
-	viper.AddConfigPath("./config/")
+	loadConfig()
+	initSentry()
+	validateSecurityOrExit()
 
-	//port := viper.GetInt("server.port")
-	//	portsrting := fmt.Sprintf(":%d", port)
-
-	if err := viper.ReadInConfig(); err != nil {
-	fmt.Printf("Error with Settings \n")
-	fmt.Printf(err.Error())
-		os.Exit(3)
-	}
-
-	if viper.GetBool("server.sentry") {
-
-		SetLog("Connect to Setry...")
-
-		sentryClientOptions := sentry.ClientOptions{
-			Dsn:              viper.GetString("sentry.dsn"),
-			EnableTracing:    viper.GetBool("sentry.tracing"),
-			Debug:            viper.GetBool("sentry.debug"),
-			TracesSampleRate: viper.GetFloat64("sentry.trace"),
-		}
-
-		rootCAs, err := gocertifi.CACerts()
-		if err != nil {
-			SetLog("Could not load CA Certificates for Sentry: " + err.Error())
-
-		} else {
-			sentryClientOptions.CaCerts = rootCAs
-		}
-
-		err = sentry.Init(sentryClientOptions)
-
-		if err != nil {
-			SetLog("Error with sentry.Init: " + err.Error())
-		}
-
-		flushsec := viper.GetDuration("sentry.flush")
-
-		defer sentry.Flush(flushsec * time.Second)
-
-	}
-
-	portvar := fmt.Sprintf("microservices.%s.port", MicroServiceName)
-	fmt.Printf(fmt.Sprintf("%s \n", portvar))
-	getport := viper.GetString(portvar)
-	fmt.Printf(fmt.Sprintf("Start %s:%s \n", MicroServiceName, getport))
-	port := ":5300"
-	if getport != "" {
-		port = fmt.Sprintf(":%s", getport)
-	}
+	port := resolvePort()
 
 	listener, err := net.Listen("tcp", port)
-
 	if err != nil {
 		grpclog.Fatalf("failed to listen: %v", err)
 	}
 
-	opts := []grpc.ServerOption{}
-	grpcServer := grpc.NewServer(opts...)
-
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			middleware.RequestIDUnary,
+			middleware.LoggingUnary,
+			middleware.SecurityUnary,
+			middleware.MetricsUnary,
+			middleware.RecoveryUnary,
+		),
+		grpc.ChainStreamInterceptor(
+			middleware.RequestIDStream,
+			middleware.LoggingStream,
+			middleware.SecurityStream,
+			middleware.MetricsStream,
+			middleware.RecoveryStream,
+		),
+	)
 	s := &Server{}
-
-	setingskey := fmt.Sprintf("microservices.%s.entrypointversion", MicroServiceName)
-	lastentrypointversion := viper.GetString(setingskey)
-
-	if lastentrypointversion != VERSIONPLUGIN {
-		go entrypoint.Init()
-	}
-
-	go entrypoint.EntryPoint()
-
-	// Run Cron
-	setingskey = fmt.Sprintf("microservices.%s.cron", MicroServiceName)
-	isCron := viper.GetBool(setingskey)
-	if isCron {
-		go cron.Init()
-	}
-
 	pb.RegisterReverseServer(grpcServer, s)
 
-	grpcServer.Serve(listener)
+	runEntrypoint()
+	runCron()
+	go StartHeartbeat()
 
+	SetLog(fmt.Sprintf("%s microservice listening on %s", MicroServiceName, port))
+
+	// Graceful shutdown listener
+	waitForShutdown(grpcServer)
+
+	if err := grpcServer.Serve(listener); err != nil {
+		SetErrorLog("gRPC server error: " + err.Error())
+	}
 }
 
-type Server struct {
+//
+// ======================= INITIALIZATION =======================
+//
+
+func loadConfig() {
+	viper.SetConfigName("config")
+	viper.AddConfigPath("./config/")
+	viper.AddConfigPath(".")
+
+	if err := viper.ReadInConfig(); err != nil {
+		SetErrorLog("Config load error: " + err.Error())
+		if viper.GetBool("server.sentry") {
+			sentry.CaptureException(err)
+		}
+		os.Exit(3)
+	}
 }
 
-func (s *Server) Do(c context.Context, request *pb.Request) (response *pb.Response, err error) {
-
-	//Check for Sign
-	sign := viper.GetString("server.sign")
-	if sign != *request.Sign {
-		return ErrorReturn(request, 401, "00001", "You are not authorized"), nil
+func initSentry() {
+	if !viper.GetBool("server.sentry") {
+		return
 	}
 
-	if viper.GetBool("server.checktoken") {
-		//Check Authorisation
-		if request.UID == nil {
-			return ErrorReturn(request, 401, "00002", "You are not authorized"), nil
+	SetLog("Connecting to Sentry...")
+
+	sentryOptions := sentry.ClientOptions{
+		Dsn:              viper.GetString("sentry.dsn"),
+		EnableTracing:    viper.GetBool("sentry.tracing"),
+		Debug:            viper.GetBool("sentry.debug"),
+		TracesSampleRate: viper.GetFloat64("sentry.trace"),
+	}
+
+	rootCAs, err := gocertifi.CACerts()
+	if err == nil {
+		sentryOptions.CaCerts = rootCAs
+	}
+
+	if err := sentry.Init(sentryOptions); err != nil {
+		SetErrorLog("sentry.Init error: " + err.Error())
+	}
+
+	flush := viper.GetDuration("sentry.flush")
+	if flush <= 0 {
+		flush = 2 * time.Second
+	}
+	defer sentry.Flush(flush)
+}
+
+func validateSecurityOrExit() {
+	if err := validateSecurityConfig(); err != nil {
+		SetErrorLog("Security config error: " + err.Error())
+		if viper.GetBool("server.sentry") {
+			sentry.CaptureException(err)
+		}
+		os.Exit(3)
+	}
+}
+
+func resolvePort() string {
+	key := fmt.Sprintf("microservices.%s.port", MicroServiceName)
+	p := viper.GetString(key)
+	if p != "" {
+		return ":" + p
+	}
+	return ":5300"
+}
+
+func runEntrypoint() {
+	key := fmt.Sprintf("microservices.%s.entrypointversion", MicroServiceName)
+	last := viper.GetString(key)
+	if last != VERSIONPLUGIN {
+		go entrypoint.Init()
+	}
+	go entrypoint.EntryPoint()
+}
+
+func runCron() {
+	key := fmt.Sprintf("microservices.%s.cron", MicroServiceName)
+	if viper.GetBool(key) {
+		go cron.Init()
+	}
+}
+
+func waitForShutdown(grpcServer *grpc.Server) {
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-stop
+		SetLog(fmt.Sprintf("Shutdown signal received (%s), stopping gRPC server gracefully...", sig.String()))
+
+		done := make(chan struct{})
+		go func() {
+			grpcServer.GracefulStop()
+			close(done)
+		}()
+
+		shutdownTimeout := viper.GetDuration("server.shutdown_timeout")
+		if shutdownTimeout <= 0 {
+			shutdownTimeout = 10 * time.Second
 		}
 
+		select {
+		case <-done:
+			SetLog("gRPC server stopped gracefully")
+		case <-time.After(shutdownTimeout):
+			SetErrorLog("Graceful shutdown timeout exceeded, forcing Stop()")
+			grpcServer.Stop()
+		}
+
+		if CachePool != nil {
+			if err := CachePool.Close(); err != nil {
+				SetErrorLog("Redis pool close error: " + err.Error())
+			} else {
+				SetLog("Redis pool closed")
+			}
+		}
+
+		SetLog("Shutdown sequence completed")
+	}()
+}
+
+//
+// ======================= G R P C —   D O  =======================
+//
+
+func (s *Server) Do(parentCtx context.Context, req *pb.Request) (*pb.Response, error) {
+	// Deadline is applied here; all other processing happens in middleware
+	timeout := viper.GetDuration("server.grpc_timeout")
+	if timeout <= 0 {
+		timeout = 30 * time.Second
 	}
 
-	//Check connection
+	ctx, cancel := context.WithTimeout(parentCtx, timeout)
+	defer cancel()
 
-	response = Init(request)
+	// Local heartbeat handler (ping from Gateway / masterservice)
+	if req.Param != nil && *req.Param == "heartbeat" {
+		return heartbeatLocal(req), nil
+	}
 
-	return response, nil
+	// Everything else goes through router
+	handler := routerLookup(req)
+	return handler(ctx, req), nil
+}
+
+// Helper for metrics / logging
+func getRouteKey(req *pb.Request) string {
+	if req == nil {
+		return "nil"
+	}
+	param := "unknown"
+	if req.Param != nil {
+		param = strings.ToLower(*req.Param)
+	}
+	if req.Method == nil {
+		return param
+	}
+	return fmt.Sprintf("%s:%s", strings.ToUpper(*req.Method), param)
+}
+
+//
+// ======================= G R P C —   S T R E A M =======================
+//
+
+func (s *Server) Stream(stream pb.Reverse_StreamServer) error {
+	// All security / logging / metrics are handled by stream middleware here
+
+	first, err := stream.Recv()
+	if err == io.EOF {
+		return nil
+	}
+	if err != nil {
+		SetErrorLog("Stream initial recv: " + err.Error())
+		return err
+	}
+
+	// timeout for entire stream
+	streamTimeout := viper.GetDuration("server.stream_timeout")
+	if streamTimeout <= 0 {
+		streamTimeout = 10 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(stream.Context(), streamTimeout)
+	defer cancel()
+
+	files := make(map[string]*fileState)
+	module := ""
+	if first.Module != nil {
+		module = *first.Module
+	}
+
+	if err := handleStreamRequest(ctx, stream, first, files, module); err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			SetErrorLog("Stream timeout exceeded")
+			return ctx.Err()
+		default:
+		}
+
+		req, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			SetErrorLog("Stream recv error: " + err.Error())
+			return err
+		}
+
+		if err := handleStreamRequest(ctx, stream, req, files, module); err != nil {
+			return err
+		}
+	}
+
+	for _, st := range files {
+		if st.f != nil {
+			st.f.Close()
+		}
+	}
+
+	return nil
+}
+
+//
+// ======================= Stream Frame Handler =======================
+//
+
+func handleStreamRequest(
+	ctx context.Context,
+	stream pb.Reverse_StreamServer,
+	req *pb.Request,
+	files map[string]*fileState,
+	module string,
+) error {
+
+	// META frames: start/end
+	if metaAny, ok := req.Args["meta"]; ok {
+		var meta pb.StringMap
+		if err := metaAny.UnmarshalTo(&meta); err != nil {
+			SetErrorLog("stream meta decode: " + err.Error())
+			return nil
+		}
+
+		filename := meta.Entries["filename"]
+		phase := meta.Entries["phase"]
+
+		switch phase {
+		case "start":
+			dir := "/tmp"
+			if module != "" {
+				dir = filepath.Join(dir, module)
+			}
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				SetErrorLog("dir create: " + err.Error())
+				return err
+			}
+
+			fp := filepath.Join(dir, filename)
+			f, err := os.Create(fp)
+			if err != nil {
+				SetErrorLog("file create: " + err.Error())
+				return err
+			}
+
+			files[filename] = &fileState{path: fp, f: f, written: 0}
+			SetLog("Start receiving: " + fp)
+
+		case "end":
+			if st, ok := files[filename]; ok && st.f != nil {
+				st.f.Close()
+				fp := st.path
+				SetLog("Finished receiving: " + fp)
+				delete(files, filename)
+				go processUploadedFile(fp)
+			}
+		}
+
+		val, _ := anypb.New(wrapperspb.String("ok"))
+		resp := &pb.Response{Data: map[string]*anypb.Any{"status": val}}
+		return stream.Send(resp)
+	}
+
+	// CHUNK frames
+	if chunkAny, ok := req.Args["chunk"]; ok {
+		var chunk pb.FileChunk
+		if err := chunkAny.UnmarshalTo(&chunk); err != nil {
+			SetErrorLog("chunk decode: " + err.Error())
+			return nil
+		}
+
+		st, ok := files[chunk.Name]
+		if !ok || st.f == nil {
+			return fmt.Errorf("chunk for unknown file")
+		}
+
+		n, err := st.f.Write(chunk.Data)
+		if err != nil {
+			SetErrorLog("write chunk: " + err.Error())
+			return err
+		}
+		st.written += int64(n)
+
+		return nil
+	}
+
+	return nil
+}
+
+//
+// ======================= Security Checks =======================
+//
+
+func validateSecurityConfig() error {
+	mode := strings.ToLower(viper.GetString("security.mode"))
+
+	switch mode {
+	case "hmac":
+		if viper.GetString("security.hmac_secret") == "" {
+			return fmt.Errorf("security.hmac_secret required")
+		}
+		if viper.GetInt("security.max_age") <= 0 {
+			return fmt.Errorf("security.max_age must be >0")
+		}
+	case "sign":
+		if viper.GetString("server.sign") == "" {
+			return fmt.Errorf("server.sign required")
+		}
+	case "mtls":
+		if viper.GetString("tls.cert") == "" ||
+			viper.GetString("tls.key") == "" ||
+			viper.GetString("tls.ca") == "" {
+			return fmt.Errorf("mTLS requires tls.cert, tls.key, tls.ca")
+		}
+	default:
+		return fmt.Errorf("unknown or missing security.mode")
+	}
+
+	return nil
+}
+
+//
+// ======================= Helpers =======================
+//
+
+func heartbeatLocal(t *pb.Request) *pb.Response {
+	return Interfacetoresponse(t, map[string]interface{}{
+		"status": "alive",
+	})
 }

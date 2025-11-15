@@ -1,0 +1,55 @@
+package main
+
+import (
+	"fmt"
+	. "{{name}}/global"
+	. "{{name}}/version"
+	"time"
+
+	. "github.com/gogufo/gufo-api-gateway/gufodao"
+	"github.com/spf13/viper"
+)
+
+func StartHeartbeat() {
+	interval := viper.GetInt("server.heartbeat")
+	if interval < 2 {
+		interval = 10 // default
+	}
+
+	for {
+		sendHeartbeat()
+		time.Sleep(time.Duration(interval) * time.Second)
+	}
+}
+
+func sendHeartbeat() {
+
+	// Формируем payload
+	args := map[string]interface{}{
+		"name":        MicroServiceName,
+		"host":        viper.GetString(fmt.Sprintf("microservices.%s.host", MicroServiceName)),
+		"port":        viper.GetString(fmt.Sprintf("microservices.%s.port", MicroServiceName)),
+		"group":       viper.GetString(fmt.Sprintf("microservices.%s.group", MicroServiceName)),
+		"isinternal":  viper.GetBool(fmt.Sprintf("microservices.%s.isinternal", MicroServiceName)),
+		"issession":   viper.GetBool(fmt.Sprintf("microservices.%s.issession", MicroServiceName)),
+		"description": viper.GetString(fmt.Sprintf("microservices.%s.description", MicroServiceName)),
+		"author":      viper.GetString(fmt.Sprintf("microservices.%s.author", MicroServiceName)),
+		"version":     VERSIONPLUGIN,
+	}
+
+	resp := GRPCReq(
+		"heartbeat", // microservice name
+		"send",      // API param
+		"",
+		args,
+		"", // token не нужен
+		"POST",
+		"", // уникальный идентификатор инстанса
+	)
+
+	if resp["httpcode"] != 200 {
+		SetErrorLog(fmt.Sprintf("[HEARTBEAT] ERROR: %+v", resp))
+	} else {
+		SetLog("[HEARTBEAT] OK")
+	}
+}

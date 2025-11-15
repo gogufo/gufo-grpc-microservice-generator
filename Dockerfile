@@ -1,4 +1,4 @@
-FROM golang:1.21.6 AS builder
+FROM golang:1.25.0 AS builder
 
 RUN apt-get update && apt-get install build-essential clang -y
 

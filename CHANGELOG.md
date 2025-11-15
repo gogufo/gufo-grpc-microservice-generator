@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.8.0 (15/11/25)
+- change microservice architecture for Gufo v1.18. now it is production ready
+
 ## 1.7.0 (11/10/24)
 - Fixed bug with microservice name
 - Print out error if can not find config files
