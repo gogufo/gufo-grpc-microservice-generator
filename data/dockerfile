@@ -8,14 +8,22 @@ RUN go mod download
 
 COPY . .
 
+ARG GIT_COMMIT=dev
+ARG BUILD_DATE=unknown
 
-RUN go build -o /go/bin/{{name}}  *.go
+
+RUN go build -ldflags "\
+  -X '{{name}}/version.GitCommit=${GIT_COMMIT}' \
+  -X '{{name}}/version.BuildDate=${BUILD_DATE}' \
+" -o /go/bin/{{name}} .
+
+
 
 
 FROM ubuntu
 
 COPY --from=builder /go/bin/{{name}} /go/bin/{{name}}
-COPY --from=builder /go/bin/config/ /go/bin/config/
+COPY --from=builder  /go/bin/config/settings.example.toml /go/bin/config/settings.toml
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 

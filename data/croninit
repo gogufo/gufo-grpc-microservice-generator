@@ -1,33 +1,90 @@
 package cron
 
 import (
-	"fmt"
-
-	. "{{name}}/global"
-
+	"sync"
 	"time"
 
-	"github.com/spf13/viper"
+	. "github.com/gogufo/gufo-api-gateway/gufodao"
 )
 
-func Init() {
+var (
+	// Local flag (admin/config level)
+	localEnabled bool
 
-	n := 0
-	for n != 1 {
+	// Heartbeat permission flag (cluster level)
+	heartbeatAllowed bool
 
-		CronJob()
+	// Indicates whether cron is currently running
+	cronEnabled bool
 
-		time.Sleep(5 * time.Second)
-		setingskey := fmt.Sprintf("%s.cron", MicroServiceName)
-		isCron := viper.GetBool(setingskey)
-		if !isCron {
-			n = 1
-		}
+	stopChan chan struct{}
+	doneChan chan struct{}
+	mu       sync.Mutex
+)
 
+// ApplyCronState is called from heartbeat (cluster permission)
+func ApplyCronState(flag bool) {
+	mu.Lock()
+	heartbeatAllowed = flag
+	mu.Unlock()
+
+	reconcile()
+}
+
+// SetLocalCronState is called from admin/config
+func SetLocalCronState(flag bool) {
+	mu.Lock()
+	localEnabled = flag
+	mu.Unlock()
+
+	reconcile()
+}
+
+// reconcile starts or stops cron based on both flags
+func reconcile() {
+	mu.Lock()
+	defer mu.Unlock()
+
+	shouldRun := localEnabled && heartbeatAllowed
+
+	// Start cron
+	if shouldRun && !cronEnabled {
+		stopChan = make(chan struct{})
+		doneChan = make(chan struct{})
+		go Init()
+		cronEnabled = true
+		SetLog("[CRON] started (local + heartbeat)")
+		return
 	}
 
+	// Stop cron
+	if !shouldRun && cronEnabled {
+		close(stopChan)
+		<-doneChan
+		cronEnabled = false
+		SetLog("[CRON] stopped (local or heartbeat disabled)")
+		return
+	}
+}
+
+func Init() {
+	defer close(doneChan)
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			CronJob()
+
+		case <-stopChan:
+			SetLog("[CRON] stop signal received")
+			return
+		}
+	}
 }
 
 func CronJob() {
-//Put your cron job codes here
+	// Put your cron job codes here
 }

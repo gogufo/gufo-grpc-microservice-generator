@@ -29,21 +29,20 @@ func CreateFiles(name string, filepath string) {
 		"cron/init.go",
 		"global/constants.go",
 		"global/variables.go",
-		"admin/get/init.go",
 		"admin/get/CheckCron.go",
-		"admin/post/init.go",
 		"admin/post/UpdateCron.go",
 		"metrics/metrics.go",
 		"middleware/logging.go",
 		"middleware/metrics.go",
 		"middleware/recovery.go",
-		"middleware/requestid.go",
-		"middleware/sequrity.go",
+		"middleware/reuestid.go",
+		"middleware/security.go",
 		".gitignore",
 		"heratbeat.go",
 		"Makefile",
 		"metrics_local.go",
 		"processUploadedFile.go",
+		"tests/health_tests.go",
 	}
 
 	datafiles := []string{
@@ -66,21 +65,20 @@ func CreateFiles(name string, filepath string) {
 		"croninit",
 		"consts",
 		"vars",
-		"admingetinit",
 		"admingetcheck",
-		"adminpostinit",
 		"adminpostupdate",
 		"metrics",
 		"logging",
 		"m-metrics",
 		"recovery",
 		"requestid",
-		"sequrity",
+		"security",
 		"gitignore",
 		"heratbeat",
 		"makefile",
 		"metrics_local",
 		"processUploadedFile",
+		"health_tests",
 	}
 
 	for i := 0; i < len(endfiles); i++ {
@@ -103,6 +101,7 @@ func CreateFiles(name string, filepath string) {
 		}
 
 		updatedmaintxt := strings.Replace(string(maintxt), "{{name}}", name, -1)
+		updatedmaintxt = strings.Replace(string(maintxt), "{{name_up}}", strings.ToUpper(name), -1)
 		updatedmaintxt = strings.Replace(string(updatedmaintxt), "{{version}}", VERSIONPLUGIN, -1)
 
 		err = ioutil.WriteFile(maingofilepath, []byte(updatedmaintxt), 0644)

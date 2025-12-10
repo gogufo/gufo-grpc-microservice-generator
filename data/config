@@ -30,8 +30,8 @@ plugindir = "/var/gufo/lib/"
 logdir   = "/var/gufo/log/"
 
 # Operational flags
-masterservice   = true
-session         = true
+masterservice   = false
+session         = false
 multiple_db_mode = false
 internal_ssl    = false
 dbcheck         = false
@@ -56,9 +56,6 @@ cert = "/etc/gufo/server.pem"
 key = "/etc/gufo/server-key.pem"
 max_age = 120                # seconds (used for HMAC expiry)
 
-
-[microservices.session]
-timeout = "5s"
 
 #######################################################################
 # TOKEN SETTINGS

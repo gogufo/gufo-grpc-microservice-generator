@@ -29,14 +29,30 @@ tidy:
 lint:
 	@echo ">> Running golangci-lint"
 	@if ! command -v golangci-lint >/dev/null 2>&1; then \
-		echo "golangci-lint not found — installing..."; \
+		echo "golangci-lnt not found — installing..."; \
 		go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
 	fi
 	golangci-lint run ./...
 
+# ===== TESTING =====
+
 test:
-	@echo ">> Running tests"
+	@echo ">> Running unit tests"
 	go test ./... -v
+
+test-integration:
+	@echo ">> Running integration tests (gRPC)"
+	docker-compose up -d --build
+	@sleep 3
+	go test ./tests -v
+	docker-compose down
+
+test-health:
+	@echo ">> Running gRPC health test"
+	docker-compose up -d --build
+	@sleep 3
+	go test ./tests -run TestHealthGRPC -v
+	docker-compose down
 
 # ===== DOCKER =====
 
@@ -64,4 +80,4 @@ clean:
 	@echo ">> Cleaning build artifacts"
 	rm -f ./bin/$(BINARY)
 
-.PHONY: build run dev tidy lint test docker docker-run compose-up compose-down clean
+.PHONY: build run dev tidy lint test test-integration test-health docker docker-run compose-up compose-down clean

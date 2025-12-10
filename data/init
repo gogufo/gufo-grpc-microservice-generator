@@ -7,22 +7,33 @@ import (
 
 	. "github.com/gogufo/gufo-api-gateway/gufodao"
 	pb "github.com/gogufo/gufo-api-gateway/proto/go"
+	"github.com/spf13/viper"
+	. "{{name}}/global"
 
 	ad "{{name}}/admin"
 	. "{{name}}/version"
 )
 
-// Unified handler signature (GEN-6 compatible)
 type handlerFuncCtx func(context.Context, *pb.Request) *pb.Response
 
 // ===============================================================
 // ROUTER TABLE
 // ===============================================================
 
-var routeTable = map[string]handlerFuncCtx{
-	"GET:info":   infoHandler,
-	"GET:health": healthHandler,
-	"POST:admin": adminHandler,
+var routeTable = map[string]handlerFuncCtx{}
+
+func InitRoutes() {
+
+	routeTable["GET:info"] = infoHandler
+	routeTable["GET:health"] = healthHandler
+
+	if viper.GetBool(fmt.Sprintf("microservices.%s.admin", MicroServiceName)) {
+		routeTable["POST:admin"] = adminHandler
+		routeTable["GET:admin"] = adminHandler
+		SetLog("[ROUTER] admin routes enabled")
+	} else {
+		SetLog("[ROUTER] admin routes disabled")
+	}
 }
 
 // routerLookup selects handler based on METHOD:param
@@ -109,5 +120,9 @@ func unknownRouteHandler(ctx context.Context, t *pb.Request) *pb.Response {
 	default:
 	}
 
-	return ErrorReturn(t, 404, "000404", "Unknown route")
+	param := "unknown"
+	if t != nil && t.Param != nil {
+		param = *t.Param
+	}
+	return ErrorReturn(t, 404, "000404", "Unknown route: "+param)
 }
