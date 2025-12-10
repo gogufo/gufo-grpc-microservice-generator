@@ -6,7 +6,7 @@ WORKDIR /go/bin/
 
 COPY . .
 
-RUN go build -o /go/bin/grpccreator *.go
+RUN go build -o /go/bin/grpccreator .
 
 
 FROM ubuntu
