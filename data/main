@@ -95,7 +95,7 @@ func main() {
 	runEntrypoint()
 	fmt.Fprintln(os.Stderr, ">>> Entrypoint OK")
 
-	//go StartHeartbeat()
+	go StartHeartbeat()
 	fmt.Fprintln(os.Stderr, ">>> StartHeartbeat OK")
 
 	SetLog(fmt.Sprintf("%s microservice listening on %s", MicroServiceName, port))
