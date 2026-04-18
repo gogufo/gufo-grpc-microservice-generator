@@ -43,6 +43,8 @@ func CreateFiles(name string, filepath string) {
 		"metrics_local.go",
 		"processUploadedFile.go",
 		"tests/health_tests.go",
+		"k8s/deployment.yaml",
+		"k8s/service.yaml",
 	}
 
 	datafiles := []string{
@@ -79,6 +81,8 @@ func CreateFiles(name string, filepath string) {
 		"metrics_local",
 		"processUploadedFile",
 		"health_tests",
+		"deployment",
+		"service",
 	}
 
 	for i := 0; i < len(endfiles); i++ {

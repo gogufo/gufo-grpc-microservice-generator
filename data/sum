@@ -31,6 +31,8 @@ github.com/go-sql-driver/mysql v1.7.0 h1:ueSltNNllEqE3qcWBTD0iQd3IpL/6U+mJxLkazJ
 github.com/go-sql-driver/mysql v1.7.0/go.mod h1:OXbVy3sEdcQ2Doequ6Z5BW6fXNQTmx+9S1MCJN5yJMI=
 github.com/gogufo/gufo-api-gateway v1.24.2 h1:xQMpg760RXCUaA2g0SsY2IGrEDvLUnDKTo8WmHaiFnc=
 github.com/gogufo/gufo-api-gateway v1.24.2/go.mod h1:FFBmoWJWEyL8U289RgRE5a67kb4CA+51uSr/5fj5OdI=
+github.com/gogufo/gufo-api-gateway v1.30.0 h1:dPxP1yDoZSlWxdA3Wyg1t9GqpYwxdipSiLJMCEa/YQk=
+github.com/gogufo/gufo-api-gateway v1.30.0/go.mod h1:FFBmoWJWEyL8U289RgRE5a67kb4CA+51uSr/5fj5OdI=
 github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
 github.com/gomodule/redigo v1.8.9 h1:Sl3u+2BI/kk+VEatbj0scLdrFhjPmbxOc1myhDP41ws=

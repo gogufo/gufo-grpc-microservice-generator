@@ -12,25 +12,21 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"{{name}}/entrypoint"
-	. "{{name}}/global"
-	"{{name}}/middleware"
-	. "{{name}}/version"
-
-	. "github.com/gogufo/gufo-api-gateway/gufodao"
-	pb "github.com/gogufo/gufo-api-gateway/proto/go"
+	"users/entrypoint"
+	"users/middleware"
 
 	"github.com/certifi/gocertifi"
 	"github.com/getsentry/sentry-go"
+	. "github.com/gogufo/gufo-api-gateway/gufodao"
+	pb "github.com/gogufo/gufo-api-gateway/proto/go"
 	"github.com/spf13/viper"
-
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
-
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+	. "users/global"
+	. "users/version"
 )
 
 // fileState describes a file being received via streaming
@@ -244,9 +240,9 @@ func waitForShutdown(grpcServer *grpc.Server) {
 
 func (s *Server) Do(parentCtx context.Context, req *pb.Request) (*pb.Response, error) {
 	// Deadline is applied here; all other processing happens in middleware
-	fmt.Fprintln(os.Stderr, ">>> {{name}} GRPC IN")
-	if req.Param != nil {
-		fmt.Fprintln(os.Stderr, ">>> {{name}} param=", *req.Param)
+	fmt.Fprintln(os.Stderr, ">>> users GRPC IN")
+	if req.Param != "" {
+		fmt.Fprintln(os.Stderr, ">>> users param=", req.Param)
 	}
 
 	timeout := viper.GetDuration("server.grpc_timeout")
@@ -258,7 +254,7 @@ func (s *Server) Do(parentCtx context.Context, req *pb.Request) (*pb.Response, e
 	defer cancel()
 
 	// Local heartbeat handler (ping from Gateway / masterservice)
-	if req.Param != nil && *req.Param == "heartbeat" {
+	if req.Param == "heartbeat" {
 		return heartbeatLocal(req), nil
 	}
 
@@ -274,14 +270,18 @@ func getRouteKey(req *pb.Request) string {
 	if req == nil {
 		return "nil"
 	}
+
 	param := "unknown"
-	if req.Param != nil {
-		param = strings.ToLower(*req.Param)
+	if req.Param != "" {
+		param = strings.ToLower(req.Param)
 	}
-	if req.Method == nil {
+
+	method := strings.ToUpper(ProtoMethodToString(req.Method))
+	if method == "" {
 		return param
 	}
-	return fmt.Sprintf("%s:%s", strings.ToUpper(*req.Method), param)
+
+	return fmt.Sprintf("%s:%s", method, param)
 }
 
 //
@@ -309,10 +309,7 @@ func (s *Server) Stream(stream pb.Reverse_StreamServer) error {
 	defer cancel()
 
 	files := make(map[string]*fileState)
-	module := ""
-	if first.Module != nil {
-		module = *first.Module
-	}
+	module := first.Module
 
 	if err := handleStreamRequest(ctx, stream, first, files, module); err != nil {
 		return err
@@ -361,74 +358,72 @@ func handleStreamRequest(
 	module string,
 ) error {
 
+	_ = ctx
+
 	// META frames: start/end
-	if metaAny, ok := req.Args["meta"]; ok {
-		var meta pb.StringMap
-		if err := metaAny.UnmarshalTo(&meta); err != nil {
-			SetErrorLog("stream meta decode: " + err.Error())
-			return nil
+	if req.Body != nil {
+		var metaCtx pb.RequestContext
+		if err := req.Body.UnmarshalTo(&metaCtx); err == nil && metaCtx.Meta != nil {
+			filename := metaCtx.Meta["filename"]
+			phase := metaCtx.Meta["phase"]
+
+			if filename != "" && phase != "" {
+				switch phase {
+				case "start":
+					dir := "/tmp"
+					if module != "" {
+						dir = filepath.Join(dir, module)
+					}
+					if err := os.MkdirAll(dir, 0o755); err != nil {
+						SetErrorLog("dir create: " + err.Error())
+						return err
+					}
+
+					fp := filepath.Join(dir, filename)
+					f, err := os.Create(fp)
+					if err != nil {
+						SetErrorLog("file create: " + err.Error())
+						return err
+					}
+
+					files[filename] = &fileState{path: fp, f: f, written: 0}
+					SetLog("Start receiving: " + fp)
+
+				case "end":
+					if st, ok := files[filename]; ok && st.f != nil {
+						st.f.Close()
+						fp := st.path
+						SetLog("Finished receiving: " + fp)
+						delete(files, filename)
+						go processUploadedFile(fp)
+					}
+				}
+
+				val, _ := anypb.New(wrapperspb.String("ok"))
+				resp := &pb.Response{Data: map[string]*anypb.Any{"status": val}}
+				return stream.Send(resp)
+			}
 		}
-
-		filename := meta.Entries["filename"]
-		phase := meta.Entries["phase"]
-
-		switch phase {
-		case "start":
-			dir := "/tmp"
-			if module != "" {
-				dir = filepath.Join(dir, module)
-			}
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				SetErrorLog("dir create: " + err.Error())
-				return err
-			}
-
-			fp := filepath.Join(dir, filename)
-			f, err := os.Create(fp)
-			if err != nil {
-				SetErrorLog("file create: " + err.Error())
-				return err
-			}
-
-			files[filename] = &fileState{path: fp, f: f, written: 0}
-			SetLog("Start receiving: " + fp)
-
-		case "end":
-			if st, ok := files[filename]; ok && st.f != nil {
-				st.f.Close()
-				fp := st.path
-				SetLog("Finished receiving: " + fp)
-				delete(files, filename)
-				go processUploadedFile(fp)
-			}
-		}
-
-		val, _ := anypb.New(wrapperspb.String("ok"))
-		resp := &pb.Response{Data: map[string]*anypb.Any{"status": val}}
-		return stream.Send(resp)
 	}
 
 	// CHUNK frames
-	if chunkAny, ok := req.Args["chunk"]; ok {
+	if req.Body != nil {
 		var chunk pb.FileChunk
-		if err := chunkAny.UnmarshalTo(&chunk); err != nil {
-			SetErrorLog("chunk decode: " + err.Error())
+		if err := req.Body.UnmarshalTo(&chunk); err == nil {
+			st, ok := files[chunk.Name]
+			if !ok || st.f == nil {
+				return fmt.Errorf("chunk for unknown file")
+			}
+
+			n, err := st.f.Write(chunk.Data)
+			if err != nil {
+				SetErrorLog("write chunk: " + err.Error())
+				return err
+			}
+			st.written += int64(n)
+
 			return nil
 		}
-
-		st, ok := files[chunk.Name]
-		if !ok || st.f == nil {
-			return fmt.Errorf("chunk for unknown file")
-		}
-
-		n, err := st.f.Write(chunk.Data)
-		if err != nil {
-			SetErrorLog("write chunk: " + err.Error())
-			return err
-		}
-		st.written += int64(n)
-
-		return nil
 	}
 
 	return nil

@@ -6,11 +6,10 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/gogufo/gufo-api-gateway/gufodao"
 	pb "github.com/gogufo/gufo-api-gateway/proto/go"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
-
-	. "github.com/gogufo/gufo-api-gateway/gufodao"
 )
 
 func SecurityUnary(
@@ -44,16 +43,26 @@ func verifyRequestSecurity(request *pb.Request) error {
 	mode := strings.ToLower(viper.GetString("security.mode"))
 
 	switch mode {
+
 	case "hmac":
 		secret := viper.GetString("security.hmac_secret")
 		maxAge := time.Duration(viper.GetInt("security.max_age")) * time.Second
-		if request.Sign == nil || request.Module == nil ||
-			!VerifyHMAC(secret, *request.Module, *request.Sign, maxAge) {
+
+		if request == nil ||
+			request.Auth == nil ||
+			request.Auth.Sign == "" ||
+			request.Module == "" ||
+			!VerifyHMAC(secret, request.Module, request.Auth.Sign, maxAge) {
+
 			return fmt.Errorf("invalid HMAC signature")
 		}
 
 	case "sign":
-		if request.Sign == nil || viper.GetString("server.sign") != *request.Sign {
+		if request == nil ||
+			request.Auth == nil ||
+			request.Auth.Sign == "" ||
+			viper.GetString("server.sign") != request.Auth.Sign {
+
 			return fmt.Errorf("invalid static signature")
 		}
 

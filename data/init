@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	ad "{{name}}/admin"
 
 	. "github.com/gogufo/gufo-api-gateway/gufodao"
 	pb "github.com/gogufo/gufo-api-gateway/proto/go"
 	"github.com/spf13/viper"
 	. "{{name}}/global"
-
-	ad "{{name}}/admin"
 	. "{{name}}/version"
 )
 
@@ -43,14 +42,15 @@ func routerLookup(t *pb.Request) handlerFuncCtx {
 		return unknownRouteHandler
 	}
 
-	method := "GET"
-	if t.Method != nil && *t.Method != "" {
-		method = strings.ToUpper(*t.Method)
+	method := ProtoMethodToString(t.Method)
+	if method == "" {
+		method = "GET"
 	}
+	method = strings.ToUpper(method)
 
 	param := "unknown"
-	if t.Param != nil && *t.Param != "" {
-		param = strings.ToLower(*t.Param)
+	if t.Param != "" {
+		param = strings.ToLower(t.Param)
 	}
 
 	key := fmt.Sprintf("%s:%s", method, param)
@@ -76,7 +76,7 @@ func infoHandler(ctx context.Context, t *pb.Request) *pb.Response {
 	}
 
 	ans := map[string]interface{}{
-		"pluginname":  "{{name}}",
+		"pluginname":  "users",
 		"version":     VERSIONPLUGIN,
 		"description": "",
 	}
@@ -105,7 +105,7 @@ func adminHandler(ctx context.Context, t *pb.Request) *pb.Response {
 	default:
 	}
 
-	if t.IsAdmin == nil || *t.IsAdmin != 1 {
+	if t.Auth == nil || !t.Auth.IsAdmin {
 		return ErrorReturn(t, 401, "000012", "You have no admin rights")
 	}
 
@@ -121,8 +121,8 @@ func unknownRouteHandler(ctx context.Context, t *pb.Request) *pb.Response {
 	}
 
 	param := "unknown"
-	if t != nil && t.Param != nil {
-		param = *t.Param
+	if t != nil && t.Param != "" {
+		param = t.Param
 	}
 	return ErrorReturn(t, 404, "000404", "Unknown route: "+param)
 }
