@@ -9,15 +9,17 @@ import (
 )
 
 func Init(t *pb.Request) *pb.Response {
-	if t.ParamID == nil {
+	if t == nil || t.ParamId == "" {
 		return ErrorReturn(t, 400, "000400", "Missing action")
 	}
 
-	switch *t.ParamID {
+	switch t.ParamId {
 	case "cronstatus":
 		return gt.CheckCron(t)
+
 	case "cron":
 		return pt.UpdateCron(t)
+
 	default:
 		return ErrorReturn(t, 404, "000404", "Unknown admin action")
 	}

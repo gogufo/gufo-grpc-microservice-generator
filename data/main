@@ -12,8 +12,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"users/entrypoint"
-	"users/middleware"
+	"{{name}}/entrypoint"
+	"{{name}}/middleware"
 
 	"github.com/certifi/gocertifi"
 	"github.com/getsentry/sentry-go"
@@ -25,8 +25,8 @@ import (
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	. "users/global"
-	. "users/version"
+	. "{{name}}/global"
+	. "{{name}}/version"
 )
 
 // fileState describes a file being received via streaming
