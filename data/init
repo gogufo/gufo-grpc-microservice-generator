@@ -76,7 +76,7 @@ func infoHandler(ctx context.Context, t *pb.Request) *pb.Response {
 	}
 
 	ans := map[string]interface{}{
-		"pluginname":  "users",
+		"pluginname":  "{{name}}",
 		"version":     VERSIONPLUGIN,
 		"description": "",
 	}

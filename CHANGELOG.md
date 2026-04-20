@@ -1,4 +1,7 @@
 # Changelog
+## 1.11.2 (10/12/25)
+- change microservice architecture for Gufo v1.30. Core changes with proto file structure
+
 
 ## 1.9.0 (10/12/25)
 - change microservice architecture for Gufo v1.24.2 now it is production ready
